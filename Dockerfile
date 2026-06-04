@@ -1,4 +1,4 @@
-FROM debian:bullseye
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -18,24 +18,30 @@ RUN apt update && apt install -y \
     policykit-1 \
     pulseaudio \
     pulseaudio-utils \
-    wine \
+    wine64 \
     wine32 \
-    firefox-esr && \
-    apt clean && rm -rf /var/lib/apt/lists/*
+    firefox \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set root password
 RUN echo "root:root" | chpasswd
 
-RUN sed -i 's/^allowed_users=.*/allowed_users=anybody/' /etc/X11/Xwrapper.config || echo "allowed_users=anybody" >> /etc/X11/Xwrapper.config
+# Allow anybody to start X sessions
+RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config
 
+# XFCE session for root
 RUN echo "startxfce4" > /root/.xsession && chmod 700 /root/.xsession
 
-# Generate machine-id for dbus
-RUN mkdir -p /var/run/dbus && dbus-uuidgen > /var/lib/dbus/machine-id
+# Generate D-Bus machine-id
+RUN mkdir -p /var/run/dbus && \
+    dbus-uuidgen > /var/lib/dbus/machine-id
 
+# XRDP configuration
 RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
     sed -i 's/security_layer=negotiate/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
-    echo "exec startxfce4" > /etc/xrdp/startwm.sh && chmod +x /etc/xrdp/startwm.sh
+    printf '#!/bin/sh\nstartxfce4\n' > /etc/xrdp/startwm.sh && \
+    chmod +x /etc/xrdp/startwm.sh
 
 RUN adduser xrdp ssl-cert
 
