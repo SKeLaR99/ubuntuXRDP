@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-echo "[+] Starting UbuntuXRDP Unified Desktop..."
+echo "[+] Starting FIXED UbuntuXRDP stack..."
 
 # =====================================================
-# A. CLEANUP (FIXES 6080 + 5900 CONFLICT ISSUES)
+# CLEAN STATE (FIXES 6080 / 5900 ERRORS)
 # =====================================================
 pkill -f Xvfb || true
 pkill -f x11vnc || true
@@ -16,13 +16,13 @@ fuser -k 6080/tcp || true
 fuser -k 5900/tcp || true
 
 # =====================================================
-# B. DBUS (FIXES XFCE CRASHES)
+# DBUS (FIX FOR XFCE CRASHES)
 # =====================================================
 mkdir -p /var/run/dbus
 dbus-daemon --system --fork
 
 # =====================================================
-# C. VIRTUAL DISPLAY (FIXES "NO X SERVER")
+# VIRTUAL DISPLAY (CRITICAL FIX)
 # =====================================================
 export DISPLAY=:1
 export XDG_RUNTIME_DIR=/tmp/runtime
@@ -33,20 +33,19 @@ Xvfb :1 -screen 0 1280x720x24 -ac +extension GLX +render -noreset &
 sleep 2
 
 # =====================================================
-# D. XFCE SESSION (FIXES BLACK SCREEN / LOGIN FREEZE)
+# XFCE (STABLE START ORDER)
 # =====================================================
 startxfce4 >/tmp/xfce.log 2>&1 &
-sleep 3
+sleep 5
 
 # =====================================================
-# E. FIREFOX COMPATIBILITY FIX (IMPORTANT)
+# FIREFOX HARD FIX (IMPORTANT)
 # =====================================================
-# Prevent sandbox crashes in container environments
-export MOZ_DISABLE_CONTENT_SANDBOX=1
-export MOZ_DISABLE_RDD_SANDBOX=1
+export GTK_THEME=Adwaita
+export LIBGL_ALWAYS_SOFTWARE=1
 
 # =====================================================
-# F. VNC SERVER (DISPLAY BRIDGE)
+# VNC SERVER
 # =====================================================
 x11vnc -display :1 \
     -forever \
@@ -56,18 +55,18 @@ x11vnc -display :1 \
     -xkb &
 
 # =====================================================
-# G. NO VNC WEB LAYER (FIXES 502 ERROR ROOT CAUSE)
+# NO VNC WEB BRIDGE
 # =====================================================
 websockify \
     --web=/usr/share/novnc/ \
     6080 localhost:5900 &
 
 # =====================================================
-# H. XRDP (OPTIONAL PARALLEL ACCESS)
+# XRDP (OPTIONAL, ISOLATED)
 # =====================================================
 /usr/sbin/xrdp-sesman &
 /usr/sbin/xrdp &
 
-echo "[+] System ready: RDP + noVNC active"
+echo "[+] SYSTEM READY: XFCE + FIREFOX + RDP + NO VNC"
 
 tail -f /dev/null
