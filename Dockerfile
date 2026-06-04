@@ -2,9 +2,10 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:1
+ENV BROWSER=firefox
 
 # =====================================================
-# 1. CORE DESKTOP + VNC STACK
+# 1. CORE DESKTOP + VNC + XRDP STACK
 # =====================================================
 RUN apt update && apt install -y \
     xfce4 \
@@ -25,14 +26,18 @@ RUN apt update && apt install -y \
     pulseaudio \
     firefox \
     xrdp \
+    xdg-utils \
+    exo-utils \
+    xdg-user-dirs \
     && apt clean && rm -rf /var/lib/apt/lists/*
 
 # =====================================================
-# 2. FIREFOX FIX (CRITICAL - CONTAINER STABILITY)
+# 2. FIREFOX STABILITY FIX (CONTAINER MODE)
 # =====================================================
 ENV MOZ_DISABLE_CONTENT_SANDBOX=1
 ENV MOZ_DISABLE_RDD_SANDBOX=1
 ENV MOZ_ENABLE_WAYLAND=0
+ENV LIBGL_ALWAYS_SOFTWARE=1
 
 # =====================================================
 # 3. USER SETUP
@@ -48,9 +53,9 @@ RUN echo "startxfce4" > /home/codespace/.xsession && \
     chown -R codespace:codespace /home/codespace
 
 # =====================================================
-# 5. XRDP SAFE CONFIG
+# 5. XRDP CONFIG (SAFE)
 # =====================================================
-RUN sed -i 's|port=3389|port=3389|g' /etc/xrdp/xrdp.ini || true
+RUN sed -i 's|port=3389|3389|g' /etc/xrdp/xrdp.ini || true
 
 # =====================================================
 # 6. START SCRIPT
