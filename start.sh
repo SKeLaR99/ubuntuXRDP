@@ -1,21 +1,48 @@
 #!/bin/bash
 set -e
 
-echo "[+] Starting UbuntuXRDP..."
+echo "[+] Starting unified desktop stack..."
 
-# Prevent duplicates (IMPORTANT FIX)
+# Kill old instances (prevents your earlier bugs)
+pkill Xvfb || true
+pkill x11vnc || true
+pkill websockify || true
 pkill xrdp || true
 pkill xrdp-sesman || true
 
-# DBus required for XFCE stability
+# DBus (required for XFCE)
 mkdir -p /var/run/dbus
 dbus-daemon --system --fork
 
-# Start XRDP (single instance only)
- /usr/sbin/xrdp-sesman
- /usr/sbin/xrdp
+# =========================
+# VIRTUAL DISPLAY (FIX)
+# =========================
+export DISPLAY=:1
+Xvfb :1 -screen 0 1280x720x16 &
+sleep 2
 
-echo "[+] XRDP running on port 3389"
+# =========================
+# XFCE SESSION
+# =========================
+startxfce4 &
+sleep 2
 
-# Keep container alive
+# =========================
+# VNC SERVER
+# =========================
+x11vnc -display :1 -forever -shared -rfbport 5900 -nopw &
+
+# =========================
+# NO VNC WEB BRIDGE
+# =========================
+websockify --web=/usr/share/novnc/ 6080 localhost:5900 &
+
+# =========================
+# XRDP (optional, safe start)
+# =========================
+/usr/sbin/xrdp-sesman &
+/usr/sbin/xrdp &
+
+echo "[+] Desktop ready (RDP + noVNC)"
+
 tail -f /dev/null
