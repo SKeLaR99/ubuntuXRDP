@@ -2,7 +2,7 @@
 
 set -e
 
-echo "[1] Cleaning state..."
+echo "[1] Cleaning old state"
 pkill -9 xrdp || true
 pkill -9 xrdp-sesman || true
 
@@ -12,15 +12,15 @@ rm -f /run/dbus/pid
 
 mkdir -p /run/dbus
 
-echo "[2] Starting DBus..."
+echo "[2] Starting DBus"
 dbus-daemon --system --fork
 
-echo "[3] Starting XRDP..."
-/usr/sbin/xrdp-sesman &
+echo "[3] Starting XRDP"
+ /usr/sbin/xrdp-sesman &
 sleep 1
 /usr/sbin/xrdp &
 
-echo "[4] Starting noVNC..."
+echo "[4] Starting noVNC stack"
 Xvfb :1 -screen 0 1280x720x16 &
 export DISPLAY=:1
 
@@ -30,6 +30,6 @@ startxfce4 &
 x11vnc -display :1 -forever -shared -rfbport 5900 -nopw &
 websockify --web=/usr/share/novnc/ 6080 localhost:5900 &
 
-echo "[OK] system running"
+echo "[OK] System ready"
 
 tail -f /dev/null
