@@ -2,47 +2,34 @@
 
 set -e
 
-echo "[+] Starting XRDP + noVNC hybrid system..."
+echo "[1] Cleaning state..."
+pkill -9 xrdp || true
+pkill -9 xrdp-sesman || true
 
-# =====================================================
-# DBUS (YOUR ORIGINAL WORKING LOGIC - KEPT)
-# =====================================================
-mkdir -p /var/run/dbus
+rm -f /var/run/xrdp/*.pid
+rm -f /run/xrdp/*.pid
+rm -f /run/dbus/pid
 
-if [ ! -f /var/lib/dbus/machine-id ]; then
-    dbus-uuidgen > /var/lib/dbus/machine-id
-fi
+mkdir -p /run/dbus
 
+echo "[2] Starting DBus..."
 dbus-daemon --system --fork
 
-# =====================================================
-# ================= XRDP (UNCHANGED CORE) =============
-# =====================================================
+echo "[3] Starting XRDP..."
 /usr/sbin/xrdp-sesman &
-exec /usr/sbin/xrdp --nodaemon &
+sleep 1
+/usr/sbin/xrdp &
 
-# =====================================================
-# ================= noVNC (ISOLATED LAYER) ============
-# =====================================================
-
+echo "[4] Starting noVNC..."
+Xvfb :1 -screen 0 1280x720x16 &
 export DISPLAY=:1
-export XDG_RUNTIME_DIR=/tmp/runtime
-mkdir -p /tmp/runtime
 
-# virtual display ONLY for noVNC
-Xvfb :1 -screen 0 1280x720x24 -ac +extension GLX +render -noreset &
 sleep 2
 
-# XFCE ONLY for noVNC session
-startxfce4 >/tmp/xfce-novnc.log 2>&1 &
-sleep 3
-
-# VNC bridge
-x11vnc -display :1 -forever -shared -rfbport 5900 -nopw -xkb &
-
-# Web bridge
+startxfce4 &
+x11vnc -display :1 -forever -shared -rfbport 5900 -nopw &
 websockify --web=/usr/share/novnc/ 6080 localhost:5900 &
 
-echo "[+] XRDP (3389) + noVNC (6080) READY"
+echo "[OK] system running"
 
 tail -f /dev/null
