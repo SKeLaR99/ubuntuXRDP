@@ -1,6 +1,8 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 RUN apt-get update && apt-get install -y \
     xrdp \
@@ -14,39 +16,49 @@ RUN apt-get update && apt-get install -y \
     pulseaudio-utils \
     sudo \
     wget \
+    curl \
     ca-certificates \
     locales \
     iproute2 \
+    net-tools \
     docker.io \
-    wine64 \
+    && locale-gen en_US.UTF-8 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Mozilla Firefox (non-Snap)
+# Install Firefox directly from Mozilla (avoids Ubuntu Snap)
 RUN wget -O /tmp/firefox.tar.xz \
     "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US" && \
+    mkdir -p /opt && \
     tar -xJf /tmp/firefox.tar.xz -C /opt && \
-    ln -s /opt/firefox/firefox /usr/local/bin/firefox && \
+    ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
     rm -f /tmp/firefox.tar.xz
 
 # Create user
-RUN useradd -m -s /bin/bash codespace && \
+RUN groupadd -f docker && \
+    useradd -m -s /bin/bash codespace && \
     echo "codespace:codespace" | chpasswd && \
     usermod -aG sudo,docker codespace
 
-# Locale
-RUN locale-gen en_US.UTF-8
+# DBus machine id
+RUN mkdir -p /var/run/dbus && \
+    dbus-uuidgen > /var/lib/dbus/machine-id
 
-# XFCE startup
+# XFCE session
 RUN echo "startxfce4" > /home/codespace/.xsession && \
-    chown codespace:codespace /home/codespace/.xsession
+    chown -R codespace:codespace /home/codespace
 
 # XRDP configuration
 RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config
 
-RUN printf '#!/bin/sh\nunset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nexec startxfce4\n' \
-    > /etc/xrdp/startwm.sh && \
-    chmod +x /etc/xrdp/startwm.sh
+RUN cat > /etc/xrdp/startwm.sh <<'EOF'
+#!/bin/sh
+unset DBUS_SESSION_BUS_ADDRESS
+unset XDG_RUNTIME_DIR
+exec startxfce4
+EOF
+
+RUN chmod +x /etc/xrdp/startwm.sh
 
 RUN adduser xrdp ssl-cert
 
