@@ -1,60 +1,75 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # =====================================================
-# 1. CORE PACKAGES (XFCE + XRDP + VNC STACK)
+# CORE XRDP + XFCE STACK (YOUR WORKING BASE)
 # =====================================================
-RUN apt update && apt install -y \
+RUN apt-get update && apt-get install -y \
+    xrdp \
+    xorgxrdp \
     xfce4 \
     xfce4-goodies \
-    xfce4-session \
+    xfce4-terminal \
+    xauth \
     dbus-x11 \
+    pulseaudio \
+    pulseaudio-utils \
+    sudo \
+    wget \
+    curl \
+    ca-certificates \
+    locales \
+    iproute2 \
+    net-tools \
+    docker.io \
     xvfb \
     x11vnc \
     novnc \
     websockify \
-    xauth \
-    x11-utils \
-    sudo \
-    curl \
-    wget \
-    nano \
-    net-tools \
-    pulseaudio \
-    firefox \
-    xrdp \
-    xorgxrdp \
     xdg-utils \
     exo-utils \
-    xdg-user-dirs \
-    && apt clean && rm -rf /var/lib/apt/lists/*
+    && locale-gen en_US.UTF-8 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # =====================================================
-# 2. FIREFOX STABILITY FIX
+# FIREFOX (YOUR WORKING METHOD - KEEP THIS)
 # =====================================================
-ENV MOZ_DISABLE_CONTENT_SANDBOX=1
-ENV MOZ_DISABLE_RDD_SANDBOX=1
-ENV MOZ_ENABLE_WAYLAND=0
-ENV LIBGL_ALWAYS_SOFTWARE=1
+RUN wget -O /tmp/firefox.tar.xz \
+    "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US" && \
+    mkdir -p /opt && \
+    tar -xJf /tmp/firefox.tar.xz -C /opt && \
+    ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
+    rm -f /tmp/firefox.tar.xz
 
 # =====================================================
-# 3. USER SETUP
+# USER SETUP
 # =====================================================
-RUN useradd -m -s /bin/bash codespace && \
+RUN groupadd -f docker && \
+    useradd -m -s /bin/bash codespace && \
     echo "codespace:codespace" | chpasswd && \
-    usermod -aG sudo codespace && \
-    adduser xrdp ssl-cert || true
+    usermod -aG sudo,docker codespace
 
 # =====================================================
-# 4. XFCE SESSION CONFIG (NOVNC)
+# DBUS FIX
+# =====================================================
+RUN mkdir -p /var/run/dbus && \
+    dbus-uuidgen > /var/lib/dbus/machine-id
+
+# =====================================================
+# XFCE FOR XRDP (UNCHANGED WORKING PART)
 # =====================================================
 RUN echo "startxfce4" > /home/codespace/.xsession && \
     chown -R codespace:codespace /home/codespace
 
 # =====================================================
-# 5. XRDP FIX (BLUE SCREEN FIX)
+# XRDP FIX (KEEP YOUR WORKING LOGIC)
 # =====================================================
+RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config
+
 RUN cat > /etc/xrdp/startwm.sh <<'EOF'
 #!/bin/sh
 unset DBUS_SESSION_BUS_ADDRESS
@@ -64,24 +79,15 @@ EOF
 
 RUN chmod +x /etc/xrdp/startwm.sh
 
-# =====================================================
-# 6. DEFAULT BROWSER FIX (XFCE ERROR FIX)
-# =====================================================
-RUN mkdir -p /usr/share/applications && \
-    cat > /usr/share/applications/firefox.desktop <<EOF
-[Desktop Entry]
-Name=Firefox
-Exec=firefox %u
-Type=Application
-Categories=Network;WebBrowser;
-MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
-EOF
+RUN adduser xrdp ssl-cert || true
 
 # =====================================================
-# 7. START SCRIPT
+# START SCRIPT
 # =====================================================
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
+
+VOLUME ["/home/codespace"]
 
 EXPOSE 3389 6080
 
