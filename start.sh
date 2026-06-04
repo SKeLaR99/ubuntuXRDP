@@ -1,18 +1,14 @@
 #!/bin/bash
 
+set -e
+
 mkdir -p /var/run/dbus
-dbus-daemon --system
 
-service xrdp-sesman start
-service xrdp start
+if [ ! -f /var/lib/dbus/machine-id ]; then
+    dbus-uuidgen > /var/lib/dbus/machine-id
+fi
 
-echo ""
-echo "================================="
-echo "XRDP READY"
-echo "Username: codespace"
-echo "Password: codespace"
-echo "Port: 3389"
-echo "================================="
-echo ""
+dbus-daemon --system --fork
 
-tail -f /dev/null
+/usr/sbin/xrdp-sesman &
+exec /usr/sbin/xrdp --nodaemon
