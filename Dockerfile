@@ -1,19 +1,23 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=:1
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
+ENV MOZ_ENABLE_WAYLAND=0
+ENV LIBGL_ALWAYS_SOFTWARE=1
 
+# =========================
+# Core system + desktop
+# =========================
 RUN apt-get update && apt-get install -y \
-    xrdp \
-    xorgxrdp \
     xfce4 \
     xfce4-goodies \
     xfce4-terminal \
-    xauth \
+    xrdp \
+    xorgxrdp \
     dbus-x11 \
-    pulseaudio \
-    pulseaudio-utils \
+    xauth \
     sudo \
     wget \
     curl \
@@ -21,12 +25,19 @@ RUN apt-get update && apt-get install -y \
     locales \
     iproute2 \
     net-tools \
+    pulseaudio \
+    pulseaudio-utils \
+    xvfb \
+    x11vnc \
+    git \
+    python3 \
     docker.io \
     && locale-gen en_US.UTF-8 \
-    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Firefox directly from Mozilla (avoids Ubuntu Snap)
+# =========================
+# Firefox (non-snap)
+# =========================
 RUN wget -O /tmp/firefox.tar.xz \
     "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US" && \
     mkdir -p /opt && \
@@ -34,21 +45,25 @@ RUN wget -O /tmp/firefox.tar.xz \
     ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
     rm -f /tmp/firefox.tar.xz
 
-# Create user
+# =========================
+# noVNC setup
+# =========================
+RUN git clone https://github.com/novnc/noVNC.git /opt/novnc && \
+    git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify
+
+# =========================
+# User setup
+# =========================
 RUN groupadd -f docker && \
     useradd -m -s /bin/bash codespace && \
     echo "codespace:codespace" | chpasswd && \
     usermod -aG sudo,docker codespace
 
-# DBus machine id
-RUN mkdir -p /var/run/dbus && \
-    dbus-uuidgen > /var/lib/dbus/machine-id
-
 # XFCE session
 RUN echo "startxfce4" > /home/codespace/.xsession && \
     chown -R codespace:codespace /home/codespace
 
-# XRDP configuration
+# XRDP config
 RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config
 
 RUN cat > /etc/xrdp/startwm.sh <<'EOF'
@@ -62,13 +77,17 @@ RUN chmod +x /etc/xrdp/startwm.sh
 
 RUN adduser xrdp ssl-cert
 
-COPY pulse-client.conf /etc/pulse/client.conf
+# =========================
+# Startup script
+# =========================
 COPY start.sh /start.sh
-
 RUN chmod +x /start.sh
 
-VOLUME ["/home/codespace"]
+# =========================
+# Ports
+# =========================
+EXPOSE 3389 6080
 
-EXPOSE 3389
+VOLUME ["/home/codespace"]
 
 CMD ["/start.sh"]
