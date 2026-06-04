@@ -1,16 +1,14 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV DISPLAY=:1
-ENV BROWSER=firefox
 
 # =====================================================
-# 1. CORE DESKTOP + VNC + XRDP STACK
+# 1. CORE PACKAGES (XFCE + XRDP + VNC STACK)
 # =====================================================
 RUN apt update && apt install -y \
     xfce4 \
-    xfce4-session \
     xfce4-goodies \
+    xfce4-session \
     dbus-x11 \
     xvfb \
     x11vnc \
@@ -26,13 +24,14 @@ RUN apt update && apt install -y \
     pulseaudio \
     firefox \
     xrdp \
+    xorgxrdp \
     xdg-utils \
     exo-utils \
     xdg-user-dirs \
     && apt clean && rm -rf /var/lib/apt/lists/*
 
 # =====================================================
-# 2. FIREFOX STABILITY FIX (CONTAINER MODE)
+# 2. FIREFOX STABILITY FIX
 # =====================================================
 ENV MOZ_DISABLE_CONTENT_SANDBOX=1
 ENV MOZ_DISABLE_RDD_SANDBOX=1
@@ -44,21 +43,42 @@ ENV LIBGL_ALWAYS_SOFTWARE=1
 # =====================================================
 RUN useradd -m -s /bin/bash codespace && \
     echo "codespace:codespace" | chpasswd && \
-    usermod -aG sudo codespace
+    usermod -aG sudo codespace && \
+    adduser xrdp ssl-cert || true
 
 # =====================================================
-# 4. XFCE SESSION FIX
+# 4. XFCE SESSION CONFIG (NOVNC)
 # =====================================================
 RUN echo "startxfce4" > /home/codespace/.xsession && \
     chown -R codespace:codespace /home/codespace
 
 # =====================================================
-# 5. XRDP CONFIG (SAFE)
+# 5. XRDP FIX (BLUE SCREEN FIX)
 # =====================================================
-RUN sed -i 's|port=3389|3389|g' /etc/xrdp/xrdp.ini || true
+RUN cat > /etc/xrdp/startwm.sh <<'EOF'
+#!/bin/sh
+unset DBUS_SESSION_BUS_ADDRESS
+unset XDG_RUNTIME_DIR
+exec startxfce4
+EOF
+
+RUN chmod +x /etc/xrdp/startwm.sh
 
 # =====================================================
-# 6. START SCRIPT
+# 6. DEFAULT BROWSER FIX (XFCE ERROR FIX)
+# =====================================================
+RUN mkdir -p /usr/share/applications && \
+    cat > /usr/share/applications/firefox.desktop <<EOF
+[Desktop Entry]
+Name=Firefox
+Exec=firefox %u
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+EOF
+
+# =====================================================
+# 7. START SCRIPT
 # =====================================================
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
