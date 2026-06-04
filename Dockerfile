@@ -1,93 +1,71 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
 
-# =====================================================
-# CORE XRDP + XFCE STACK (YOUR WORKING BASE)
-# =====================================================
+# ---------------------------
+# Base + GUI + XRDP stack
+# ---------------------------
 RUN apt-get update && apt-get install -y \
     xrdp \
     xorgxrdp \
     xfce4 \
     xfce4-goodies \
-    xfce4-terminal \
-    xauth \
     dbus-x11 \
-    pulseaudio \
-    pulseaudio-utils \
-    sudo \
+    x11-xserver-utils \
+    x11vnc \
+    xvfb \
     wget \
     curl \
-    ca-certificates \
-    locales \
-    iproute2 \
+    sudo \
     net-tools \
-    docker.io \
-    xvfb \
-    x11vnc \
+    iproute2 \
+    python3 \
+    python3-pip \
     novnc \
     websockify \
-    xdg-utils \
-    exo-utils \
-    && locale-gen en_US.UTF-8 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# =====================================================
-# FIREFOX (YOUR WORKING METHOD - KEEP THIS)
-# =====================================================
-RUN wget -O /tmp/firefox.tar.xz \
+# ---------------------------
+# Firefox (non-snap stable build)
+# ---------------------------
+RUN wget -O /tmp/firefox.tar.bz2 \
     "https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US" && \
-    mkdir -p /opt && \
-    tar -xJf /tmp/firefox.tar.xz -C /opt && \
-    ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
-    rm -f /tmp/firefox.tar.xz
+    tar -xjf /tmp/firefox.tar.bz2 -C /opt && \
+    ln -s /opt/firefox/firefox /usr/local/bin/firefox && \
+    rm /tmp/firefox.tar.bz2
 
-# =====================================================
-# USER SETUP
-# =====================================================
-RUN groupadd -f docker && \
-    useradd -m -s /bin/bash codespace && \
+# ---------------------------
+# User setup
+# ---------------------------
+RUN useradd -m -s /bin/bash codespace && \
     echo "codespace:codespace" | chpasswd && \
-    usermod -aG sudo,docker codespace
+    usermod -aG sudo codespace
 
-# =====================================================
-# DBUS FIX
-# =====================================================
-RUN mkdir -p /var/run/dbus && \
-    dbus-uuidgen > /var/lib/dbus/machine-id
-
-# =====================================================
-# XFCE FOR XRDP (UNCHANGED WORKING PART)
-# =====================================================
-RUN echo "startxfce4" > /home/codespace/.xsession && \
-    chown -R codespace:codespace /home/codespace
-
-# =====================================================
-# XRDP FIX (KEEP YOUR WORKING LOGIC)
-# =====================================================
+# ---------------------------
+# XRDP config fix
+# ---------------------------
 RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config
 
 RUN cat > /etc/xrdp/startwm.sh <<'EOF'
 #!/bin/sh
 unset DBUS_SESSION_BUS_ADDRESS
 unset XDG_RUNTIME_DIR
+export XAUTHORITY=$HOME/.Xauthority
 exec startxfce4
 EOF
 
 RUN chmod +x /etc/xrdp/startwm.sh
 
-RUN adduser xrdp ssl-cert || true
+# ---------------------------
+# noVNC setup
+# ---------------------------
+RUN ln -s /usr/share/novnc/vnc.html /usr/share/novnc/index.html
 
-# =====================================================
-# START SCRIPT
-# =====================================================
+# ---------------------------
+# Startup script (CRITICAL FIX)
+# ---------------------------
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
-
-VOLUME ["/home/codespace"]
 
 EXPOSE 3389 6080
 
